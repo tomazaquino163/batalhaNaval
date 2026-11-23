@@ -56,3 +56,10 @@ body:has(#home:not(.hide)) .bubbles {
   background:radial-gradient(circle at 10% 80%,#b8db7914 4px,transparent 6px),
              radial-gradient(circle at 70% 30%,#b8db7914 5px,transparent 7px);
 }
+
+/* Botão de retirada do capitão, disponível durante a partida */
+.matchcontrols{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:flex-end}
+.abandon-btn{display:flex;align-items:center;justify-content:center;gap:9px;padding:6px 13px 6px 6px;border-radius:14px;border:1px solid #c18a51;color:#ffe9c0;background:linear-gradient(135deg,#402518,#712b1d);font-weight:900;box-shadow:0 5px 16px #0005}
+.abandon-btn img{width:48px;height:48px;object-fit:contain;flex:none}
+.abandon-btn:hover:not(:disabled){border-color:#ffbc69;box-shadow:0 0 20px #dc753f55}
+@media(max-width:700px){.matchcontrols{width:100%;justify-content:space-between}.abandon-btn{font-size:13px}.abandon-btn img{width:40px;height:40px}}
