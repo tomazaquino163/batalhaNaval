@@ -63,3 +63,16 @@ body:has(#home:not(.hide)) .bubbles {
 .abandon-btn img{width:48px;height:48px;object-fit:contain;flex:none}
 .abandon-btn:hover:not(:disabled){border-color:#ffbc69;box-shadow:0 0 20px #dc753f55}
 @media(max-width:700px){.matchcontrols{width:100%;justify-content:space-between}.abandon-btn{font-size:13px}.abandon-btn img{width:40px;height:40px}}
+
+/* Revelacao cinematografica: somente navios completamente atingidos */
+.reveal-banner{margin:10px auto 18px;padding:17px 20px;max-width:900px;border-radius:18px;text-align:center;font:900 clamp(15px,2.5vw,26px) Orbitron,sans-serif;color:#ffe6a6;background:linear-gradient(115deg,#221109,#6b1a04,#221109);border:2px solid #ff9a23;box-shadow:0 0 30px #f7612266,inset 0 0 26px #ff892e33;text-shadow:0 0 12px #ff7b24;}
+.reveal-banner strong{color:#fff8df;overflow-wrap:anywhere;}
+.reveal-pop{animation:revealPop .75s ease-out both;}
+.cell.ship-burning{background:radial-gradient(circle at 50% 75%,#ffeb55,#ff7d16 45%,#b3290c 75%,#441009)!important;color:#170800!important;border-color:#ffe77a!important;box-shadow:inset 0 0 8px #fff5a0,0 0 12px #ff6b16;animation:flameCell .57s ease-in-out infinite alternate;z-index:1;overflow:visible;}
+.cell.ship-burning::after{content:'🔥';position:absolute;left:50%;bottom:38%;transform:translateX(-50%);font-size:clamp(13px,1.6vw,24px);filter:drop-shadow(0 0 6px #ff5200);animation:flameRise .7s ease-in-out infinite alternate;pointer-events:none;}
+.cell.revealed-sunk{background:#392e24!important;color:#d0beb0!important;border:1px solid #846551!important;opacity:.82;}
+.cell.revealed-sunk::after{content:'⚓';position:absolute;font-size:clamp(9px,1.2vw,17px);opacity:.6;}
+@keyframes flameCell{from{filter:brightness(.95)}to{filter:brightness(1.28)}}
+@keyframes flameRise{from{transform:translate(-50%,1px) scale(.8);opacity:.78}to{transform:translate(-50%,-5px) scale(1.15);opacity:1}}
+@keyframes revealPop{0%{opacity:0;transform:scale(.75)}55%{opacity:1;transform:scale(1.06)}100%{opacity:1;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.cell.ship-burning,.cell.ship-burning::after,.reveal-pop{animation:none!important}}

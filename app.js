@@ -3,7 +3,7 @@
 'use strict';
 const WORDS=['CASO DE USO','PROTOTIPACAO','ORIENTADO A OBJETOS','REQUISITOS','INCREMENTAL','DIAGRAMA DE CLASSES','UML','SCRUM','HERANCA','ENCAPSULAMENTO','POLIMORFISMO','BACKLOG','MODELAGEM','ARQUITETURA','TESTES','ATOR','CLASSE','INTERFACE','CASO DE TESTE','SEQUENCIA'];
 const N=18, $=id=>document.getElementById(id), norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z]/g,'');
-const cfg=window.BNC_CONFIG||{}; let db=null, uid=null, code='', snapshot=null, entryMode='create', placements=[], selected=WORDS[0], orient='H', busy=false, eventSeen=null, lastStage='', sounds=true, poll=null, toastTimer=null, lastRpsId=null, modalFor=null;
+const cfg=window.BNC_CONFIG||{}; let db=null, uid=null, code='', snapshot=null, entryMode='create', placements=[], selected=WORDS[0], orient='H', busy=false, eventSeen=null, lastStage='', sounds=true, poll=null, toastTimer=null, lastRpsId=null, modalFor=null, questionDelay=null, revealedNotice=null;
 function show(id,yes=true){$(id).classList.toggle('hide',!yes)}
 function toast(msg){$('toast').textContent=msg;show('toast');clearTimeout(toastTimer);toastTimer=setTimeout(()=>show('toast',false),3200)}
 function errText(e){return (e?.message||String(e)).replace(/^Error:\s*/,'')}
@@ -29,20 +29,81 @@ if(s.stage==='waiting'){$('matchStatus').textContent='Aguardando o segundo coman
 if(s.stage==='placement'){const ready=uid===s.host?s.host_ready:s.guest_ready;show('placement',!ready);if(ready)$('matchStatus').textContent='Sua frota está pronta! Aguardando o colega ou o cronômetro.';if(!ready){makeBoard('setupBoard',setupCell);renderSetup();updateClock()}}
 if(s.stage==='rps'){show('rps');const opts=document.querySelectorAll('[data-rps]');opts.forEach(b=>b.disabled=!!s.my_rps);$('rpsMessage').textContent=s.my_rps?'Sua escolha foi registrada. Aguardando o adversário...':'Escolha pedra, papel ou tesoura!'}
 if(s.stage==='battle'){show('battle');makeBoard('enemyBoard',(x,y)=>fire(x,y));makeBoard('ownBoard',()=>{});renderBattle(s)}
-if(s.stage==='finished'||s.stage==='cancelled'){show('finished');show('battle',false);const won=s.winner===uid, quit=s.last_event?.type==='abandon';if(s.stage==='cancelled'){$('finishTitle').textContent='⚓ Sala cancelada';$('finishMessage').textContent='A partida foi encerrada antes da entrada de outro comandante.'}else{$('finishTitle').textContent=quit?(won?'🏆 VITÓRIA POR DESISTÊNCIA!':'🐔 VOCÊ ABANDONOU O BARCO!'):(won?'🏆 VITÓRIA, COMANDANTE!':'⚓ FIM DE BATALHA!');$('finishMessage').textContent=`${quit?(won?'Seu adversário abandonou o barco. Vitória concedida a você!':'Você abandonou o barco. A vitória foi concedida ao adversário.'):(won?'Você afundou toda a frota rival!':'O oponente conquistou seu oceano.')} Placar: ${myName} ${myScore} × ${rival||'—'} ${rivalScore}.`}ranking()}
+if(s.stage==='finished'||s.stage==='cancelled'){show('revealBanner',false);show('finished');show('battle',false);const won=s.winner===uid, quit=s.last_event?.type==='abandon';if(s.stage==='cancelled'){$('finishTitle').textContent='⚓ Sala cancelada';$('finishMessage').textContent='A partida foi encerrada antes da entrada de outro comandante.'}else{$('finishTitle').textContent=quit?(won?'🏆 VITÓRIA POR DESISTÊNCIA!':'🐔 VOCÊ ABANDONOU O BARCO!'):(won?'🏆 VITÓRIA, COMANDANTE!':'⚓ FIM DE BATALHA!');$('finishMessage').textContent=`${quit?(won?'Seu adversário abandonou o barco. Vitória concedida a você!':'Você abandonou o barco. A vitória foi concedida ao adversário.'):(won?'Você afundou toda a frota rival!':'O oponente conquistou seu oceano.')} Placar: ${myName} ${myScore} × ${rival||'—'} ${rivalScore}.`}ranking()}
 if(s.last_event?.id!==eventSeen){if(eventSeen!==null)handleEvent(s.last_event);eventSeen=s.last_event?.id||null}
-if(s.pending&&s.stage==='battle'&&modalFor!==s.pending.id){modalFor=s.pending.id;renderQuestion(s.pending)}else if(!s.pending){modalFor=null;show('questionModal',false)}
+if(s.pending&&s.stage==='battle'&&modalFor!==s.pending.id){
+  modalFor=s.pending.id;
+  clearTimeout(questionDelay);
+  // Mostra o navio em chamas antes de abrir a pergunta ao atacante.
+  questionDelay=setTimeout(()=>{if(snapshot?.pending?.id===s.pending.id&&snapshot?.stage==='battle')renderQuestion(s.pending)},1900);
+}else if(!s.pending){clearTimeout(questionDelay);modalFor=null;show('questionModal',false)}
 }
-function renderBattle(s){const mine=occupiedOf(s.my_ships);const fired=new Map(s.my_shots.map(a=>[`${a.x},${a.y}`,a]));const incoming=new Map(s.incoming_shots.map(a=>[`${a.x},${a.y}`,a]));const sunkWords=new Set(s.my_ships.filter(sh=>sh.sunk).map(sh=>sh.word));const myTurn=s.turn_uid===uid&&!s.question_waiting;
-$('turnBadge').textContent=s.question_waiting?(s.pending?'🧠 Responda à pergunta!':'🧠 O oponente está respondendo...'):myTurn?'🎯 SUA VEZ DE ATIRAR':'⌛ Vez do adversário';for(let y=0;y<N;y++)for(let x=0;x<N;x++){const a=cell('enemyBoard',x,y),b=cell('ownBoard',x,y),shot=fired.get(`${x},${y}`),received=incoming.get(`${x},${y}`),own=mine.get(`${x},${y}`);a.className='cell'+(shot?(shot.hit?' hit':' miss'):'');a.textContent=shot?.hit?shot.letter||'✓':'';a.disabled=!!shot||!myTurn; b.className='cell'+(own?' ship':'')+(received?(received.hit?' hit':' miss'):'')+(own&&sunkWords.has(own.ship.word)?' sunk':'');b.textContent=own?own.letter:'';b.disabled=true}
-$('battleLog').textContent=myTurn?'🎯 Sua vez! Escolha uma coordenada do oceano inimigo.':s.question_waiting?'🧠 Um desafio está em andamento...':'⏳ Aguarde seu próximo turno.'}
+function shipCells(boardId,ship){
+ const letters=norm(ship.word),nodes=[];
+ for(let i=0;i<letters.length;i++){
+  const x=ship.x+(ship.dir==='H'?i:0),y=ship.y+(ship.dir==='V'?i:0);
+  const node=cell(boardId,x,y);if(node)nodes.push({node,letter:letters[i]});
+ }
+ return nodes;
+}
+function burnShip(boardId,ship){
+ for(const {node,letter} of shipCells(boardId,ship)){
+  node.textContent=letter;
+  node.classList.add('ship-burning');
+  node.setAttribute('aria-label',`Navio revelado: ${ship.word}, pegando fogo`);
+ }
+}
+function showRevealedShip(word){
+ if(revealedNotice===word)return;
+ revealedNotice=word;
+ $('revealName').textContent=word;
+ show('revealBanner');
+ $('revealBanner').classList.remove('reveal-pop');
+ void $('revealBanner').offsetWidth;
+ $('revealBanner').classList.add('reveal-pop');
+ audio(true);
+}
+function renderBattle(s){
+ const mine=occupiedOf(s.my_ships);
+ const fired=new Map(s.my_shots.map(a=>[`${a.x},${a.y}`,a]));
+ const incoming=new Map(s.incoming_shots.map(a=>[`${a.x},${a.y}`,a]));
+ const sunkWords=new Set(s.my_ships.filter(sh=>sh.sunk).map(sh=>sh.word));
+ const revealed=s.revealed_enemy_ships||[];
+ const myTurn=s.turn_uid===uid&&!s.question_waiting;
+ $('turnBadge').textContent=s.question_waiting?(s.pending?'🧠 Responda à pergunta!':'🧠 O oponente está respondendo...'):myTurn?'🎯 SUA VEZ DE ATIRAR':'⌛ Vez do adversário';
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+  const a=cell('enemyBoard',x,y),b=cell('ownBoard',x,y),shot=fired.get(`${x},${y}`),received=incoming.get(`${x},${y}`),own=mine.get(`${x},${y}`);
+  a.className='cell'+(shot?(shot.hit?' hit':' miss'):'');
+  a.textContent=shot?.hit?shot.letter||'✓':'';
+  a.disabled=!!shot||!myTurn;
+  b.className='cell'+(own?' ship':'')+(received?(received.hit?' hit':' miss'):'')+(own&&sunkWords.has(own.ship.word)?' sunk':'');
+  b.textContent=own?own.letter:'';b.disabled=true;
+ }
+ // O estado recebido do servidor nunca contém a posição de palavras incompletas.
+ for(const sh of revealed){if(!sh.sunk)burnShip('enemyBoard',sh);else for(const {node,letter} of shipCells('enemyBoard',sh)){node.textContent=letter;node.classList.add('revealed-sunk')}}
+ for(const sh of s.my_ships){
+  if(!sh.sunk && sh.hits?.length===norm(sh.word).length)burnShip('ownBoard',sh);
+ }
+ const active=revealed.find(sh=>!sh.sunk)||s.my_ships.find(sh=>!sh.sunk&&sh.hits?.length===norm(sh.word).length);
+ if(active){showRevealedShip(active.word)}else{
+  revealedNotice=null;show('revealBanner',false);
+ }
+ $('battleLog').textContent=active?`🔥 NAVIO DESCOBERTO: ${active.word}! ${s.pending?'Responda à questão para ganhar 100 pontos.':'Aguardando a resposta...'}`:myTurn?'🎯 Sua vez! Escolha uma coordenada do oceano inimigo.':s.question_waiting?'🧠 Um desafio está em andamento...':'⏳ Aguarde seu próximo turno.';
+}
 async function fire(x,y){if(busy||!snapshot||snapshot.stage!=='battle'||snapshot.turn_uid!==uid)return;busy=true;try{await rpc('fire',{c:code,px:x,py:y});await refresh(true)}catch(e){toast(errText(e))}finally{busy=false}}
-function handleEvent(ev){if(!ev)return;if(ev.type==='tie'){toast('🤝 Empate no joquempô! Escolham novamente.');return}if(ev.type==='rps'){toast(ev.first===uid?'✊ Você venceu o joquempô! Comece a batalha!':'✋ Seu colega venceu o joquempô.');return}if(ev.type==='shot'){const onEnemy=ev.shooter===uid;const cellEl=cell(onEnemy?'enemyBoard':'ownBoard',ev.x,ev.y);if(cellEl)torpedo(cellEl);toast(ev.hit?(onEnemy?'💥 Você acertou uma letra! +10 pontos':'🔥 Sua frota foi atingida!'):(onEnemy?'🌊 Água! Seu torpedo errou.':'🌊 O adversário errou o tiro.'));return}if(ev.type==='sunk'){audio(true);const board=$('enemyBoard');const area=board.getBoundingClientRect();fx(area.left+area.width/2,area.top+area.height/2,true);toast(ev.correct?`🚢 ${ev.word} afundou! +100 pontos!`:`🚢 ${ev.word} afundou, sem bônus de 100 pontos.`)}}
+function handleEvent(ev){if(!ev)return;if(ev.type==='tie'){toast('🤝 Empate no joquempô! Escolham novamente.');return}if(ev.type==='rps'){toast(ev.first===uid?'✊ Você venceu o joquempô! Comece a batalha!':'✋ Seu colega venceu o joquempô.');return}if(ev.type==='shot'){const onEnemy=ev.shooter===uid;const cellEl=cell(onEnemy?'enemyBoard':'ownBoard',ev.x,ev.y);if(cellEl)torpedo(cellEl);toast(ev.hit?(onEnemy?'💥 Você acertou uma letra! +10 pontos':'🔥 Sua frota foi atingida!'):(onEnemy?'🌊 Água! Seu torpedo errou.':'🌊 O adversário errou o tiro.'));return}if(ev.type==='sunk'){
+ audio(true);
+ const board=$(ev.shooter===uid?'enemyBoard':'ownBoard');
+ const area=board.getBoundingClientRect();
+ if(area.width&&area.height)fx(area.left+area.width/2,area.top+area.height/2,true);
+ show('revealBanner',false);
+ toast(ev.correct?`🚢 ${ev.word} afundou! +100 pontos!`:`🚢 ${ev.word} afundou, sem bônus de 100 pontos.`)
+}}
 function renderQuestion(q){show('questionModal');$('questionText').textContent=q.question;const area=$('answers');area.innerHTML='';q.options.forEach((answer,i)=>{const b=document.createElement('button');b.className='answer';b.textContent=String.fromCharCode(65+i)+') '+answer;b.onclick=()=>answerQuestion(i);area.append(b)})}
-async function answerQuestion(choice){if(busy)return;busy=true;document.querySelectorAll('.answer').forEach(b=>b.disabled=true);try{const good=await rpc('answer',{c:code,choice});show('questionModal',false);modalFor=null;toast(good?'✅ Resposta correta! +100 pontos!':'❌ Resposta incorreta: navio afundado, sem bônus.');await refresh(true)}catch(e){toast(errText(e));document.querySelectorAll('.answer').forEach(b=>b.disabled=false)}finally{busy=false}}
+async function answerQuestion(choice){if(busy)return;busy=true;document.querySelectorAll('.answer').forEach(b=>b.disabled=true);try{const good=await rpc('answer',{c:code,choice});show('questionModal',false);modalFor=null;clearTimeout(questionDelay);questionDelay=null;toast(good?'✅ Resposta correta! +100 pontos!':'❌ Resposta incorreta: navio afundado, sem bônus.');await refresh(true)}catch(e){toast(errText(e));document.querySelectorAll('.answer').forEach(b=>b.disabled=false)}finally{busy=false}}
 async function ranking(){try{const rows=await rpc('leaderboard',{});const area=$('rankList');area.innerHTML='';if(!rows?.length){area.textContent='Nenhuma batalha concluída ainda.';return}rows.forEach((p,i)=>{const d=document.createElement('div');d.className='rankitem';const label=document.createElement('span');label.textContent=`${i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`} ${p.name} (${p.wins} vitória${p.wins===1?'':'s'})`;const score=document.createElement('strong');score.textContent=p.points+' pts';d.append(label,score);area.append(d)})}catch(e){console.warn(e)}}
 async function restore(){const previous=localStorage.getItem('bnc_last_room');if(!previous)return;try{await connect();const s=await rpc('state',{c:previous});if(s.stage==='finished'||s.stage==='cancelled'){ranking();return}code=previous;snapshot=s;show('home',false);show('game');renderState(s);poll=setInterval(refresh,1700);toast('Partida recuperada!')}catch{localStorage.removeItem('bnc_last_room')}}
-async function abandonMatch(){if(busy||!code||!snapshot||['finished','cancelled'].includes(snapshot.stage))return;if(!window.confirm('🐔 Tem certeza que vai abandonar o barco?\n\nO adversário será declarado vencedor e a partida será encerrada!'))return;busy=true;$('abandon').disabled=true;try{await rpc('abandon',{c:code});show('questionModal',false);modalFor=null;await refresh(true);toast('🚢 Partida encerrada.')}catch(e){toast('Não foi possível abandonar: '+errText(e))}finally{busy=false;$('abandon').disabled=false}}
+async function abandonMatch(){if(busy||!code||!snapshot||['finished','cancelled'].includes(snapshot.stage))return;if(!window.confirm('🐔 Tem certeza que vai abandonar o barco?\n\nO adversário será declarado vencedor e a partida será encerrada!'))return;busy=true;$('abandon').disabled=true;try{await rpc('abandon',{c:code});show('questionModal',false);modalFor=null;clearTimeout(questionDelay);questionDelay=null;await refresh(true);toast('🚢 Partida encerrada.')}catch(e){toast('Não foi possível abandonar: '+errText(e))}finally{busy=false;$('abandon').disabled=false}}
 $('abandon').onclick=abandonMatch;
 $('create').onclick=()=>start('create');$('join').onclick=()=>start('join');$('back').onclick=()=>{show('entry',false);show('home')};$('entrySubmit').onclick=submitEntry;$('roomCode').oninput=e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'');$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(code);toast('📋 Código copiado: '+code)}catch{toast('Compartilhe o código: '+code)}};$('sound').onclick=()=>{sounds=!sounds;$('sound').textContent=sounds?'🔊':'🔇'};$('rotate').onclick=()=>{orient=orient==='H'?'V':'H';$('rotate').textContent=orient==='H'?'↻ Horizontal':'↻ Vertical'};$('auto').onclick=autoPlace;$('clear').onclick=()=>{placements=[];selected=WORDS[0];renderSetup()};$('ready').onclick=async()=>{if(busy||placements.length!==7)return;busy=true;try{await rpc('place',{c:code,layout:placements});toast('✅ Frota posicionada!');await refresh(true)}catch(e){toast(errText(e))}finally{busy=false}};document.querySelectorAll('[data-rps]').forEach(b=>b.onclick=async()=>{if(busy)return;busy=true;try{await rpc('rps',{c:code,choice:b.dataset.rps});await refresh(true)}catch(e){toast(errText(e))}finally{busy=false}});$('playAgain').onclick=()=>{localStorage.removeItem('bnc_last_room');location.reload()};$('refreshRank').onclick=ranking;setInterval(updateClock,500);restore().finally(()=>ranking());
 })();
