@@ -76,3 +76,7 @@ body:has(#home:not(.hide)) .bubbles {
 @keyframes flameRise{from{transform:translate(-50%,1px) scale(.8);opacity:.78}to{transform:translate(-50%,-5px) scale(1.15);opacity:1}}
 @keyframes revealPop{0%{opacity:0;transform:scale(.75)}55%{opacity:1;transform:scale(1.06)}100%{opacity:1;transform:scale(1)}}
 @media(prefers-reduced-motion:reduce){.cell.ship-burning,.cell.ship-burning::after,.reveal-pop{animation:none!important}}
+
+/* Link exclusivo do painel docente */
+.teacher-link{display:inline-flex;align-items:center;gap:6px;color:#d6edba;text-decoration:none;font-weight:700;font-size:13px;border:1px solid #607947;background:rgba(33,58,24,.52);padding:9px 12px;border-radius:12px}.teacher-link:hover{background:#385a2c;color:#fff}
+@media(max-width:600px){.teacher-link{font-size:11px;padding:7px}}
